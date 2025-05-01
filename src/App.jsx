@@ -14,7 +14,7 @@ const fetchRuneData = async (addresses) => {
   const cacheKey = `runeData-${addresses.join('-')}`;
   const cachedData = localStorage.getItem(cacheKey);
   if (cachedData) {
-    return JSON.parse(cachedData);
+    // return JSON.parse(cachedData);
   }
 
   // 速率控制 - 确保不超过5次/秒
@@ -44,12 +44,14 @@ const fetchRuneData = async (addresses) => {
         if (!runeMap.has(rune.spacedRune)) {
           runeMap.set(rune.spacedRune, {
             symbol: rune.spacedRune,
+            divisibility: rune.divisibility,
             holdings: []
           });
         }
         runeMap.get(rune.spacedRune).holdings.push({
           address: addresses[index],
-          amount: rune.amount
+          amount: rune.amount,
+          divisibility: rune.divisibility
         });
       });
     }
@@ -59,6 +61,41 @@ const fetchRuneData = async (addresses) => {
   // 保存到缓存
   localStorage.setItem(cacheKey, JSON.stringify(result));
   return result;
+}
+
+// 获取符文价格
+const fetchRunePrice = async (symbol) => {
+  const cacheKey = `runePrice-${symbol}`;
+  const cachedPrice = localStorage.getItem(cacheKey);
+  if (cachedPrice) {
+    return JSON.parse(cachedPrice);
+  }
+
+  try {
+    const response = await fetch('https://open-api.unisat.io/v3/market/runes/auction/runes_types_specified', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.unisatApiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        timeType: 'day1',
+        tick: symbol
+      })
+    });
+
+    const data = await response.json();
+    if (data.code === 0) {
+      const price = data.data.curPrice; // 单位是sat
+      localStorage.setItem(cacheKey, JSON.stringify(price));
+      return price;
+    }
+    return 0;
+  } catch (error) {
+    console.error('获取符文价格失败:', error);
+    return 0;
+  }
 }
 
 function RuneAssetViewer() {
@@ -108,6 +145,7 @@ function RuneAssetViewer() {
                   key={index}
                   symbol={rune.symbol}
                   holdings={rune.holdings}
+                  divisibility={rune.divisibility}
                 />
               ))}
             </div>
