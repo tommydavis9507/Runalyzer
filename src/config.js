@@ -1,0 +1,10 @@
+// 配置文件 - 请勿提交到版本控制
+const config = {
+  unisatApiKey: '92f3756c67c4fa5b43bb9f84bcd52e89237b1fcc589904656aa093c2cd84cb70',
+  rateLimit: {
+    perSecond: 5, // 每秒最多5次请求
+    perDay: 2000 // 每天最多2000次请求
+  }
+};
+
+export default config;
