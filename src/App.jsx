@@ -233,7 +233,8 @@ function RuneAssetViewer() {
             <button 
               onClick={() => {
                 setIsRateLoading(true);
-                fetch('/api/gateio/spot/tickers?currency_pair=BTC_USDT')
+                // fetch('/api/gateio/spot/tickers?currency_pair=BTC_USDT')
+                fetch('/api/gateio?currency_pair=BTC_USDT')
                   .then(res => {
                     if (!res.ok) {
                       throw new Error(`HTTP error! status: ${res.status}`);

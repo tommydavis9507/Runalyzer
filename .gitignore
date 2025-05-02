@@ -25,3 +25,4 @@ dist-ssr
 
 # 配置文件
 src/config.js
+.vercel
