@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
 import AddressInput from './components/AddressInput'
 import RuneCard from './components/RuneCard'
 
@@ -104,6 +105,40 @@ function RuneAssetViewer() {
   const [btcRate, setBtcRate] = useState(0);
   const [isRateLoading, setIsRateLoading] = useState(false);
   const [initialData, setInitialData] = useState(null);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
+  const [sortedRunes, setSortedRunes] = useState([]);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['runeData', addresses],
+    queryFn: () => fetchRuneData(addresses),
+    enabled: addresses.length > 0,
+    staleTime: 30000 // 30秒内不重新请求
+  })
+
+  useEffect(() => {
+    const processRunes = async () => {
+      const runeData = data || initialData;
+      if (!runeData) return;
+
+      const processed = await Promise.all(
+        runeData.map(async (rune) => {
+          const price = await fetchRunePrice(rune.symbol);
+          const totalValue = rune.holdings.reduce((sum, holding) => {
+            const amount = holding.amount / Math.pow(10, holding.divisibility || 0);
+            return sum + amount * (price || 0) / 100000000 * (currency === 'USDT' ? btcRate : 1);
+          }, 0);
+          return { ...rune, totalValue };
+        })
+      );
+      
+      const sorted = [...processed].sort((a, b) => 
+        sortOrder === 'desc' ? b.totalValue - a.totalValue : a.totalValue - b.totalValue
+      );
+      setSortedRunes(sorted);
+    };
+    
+    processRunes();
+  }, [data, initialData, currency, btcRate, sortOrder])
 
   // 加载缓存的符文数据
   useEffect(() => {
@@ -119,13 +154,6 @@ function RuneAssetViewer() {
       }
     }
   }, []);
-
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['runeData', addresses],
-    queryFn: () => fetchRuneData(addresses),
-    enabled: addresses.length > 0,
-    staleTime: 30000 // 30秒内不重新请求
-  })
 
   const handleAddressSubmit = (newAddresses) => {
     setAddresses(newAddresses)
@@ -178,6 +206,14 @@ function RuneAssetViewer() {
               )}
             </button>
             <button 
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+              className="p-2 rounded-md hover:bg-gray-200 flex items-center"
+              title="切换排序顺序"
+            >
+              <ArrowsRightLeftIcon className="h-4 w-4" />
+              <span className="ml-1">{sortOrder === 'desc' ? '降序' : '升序'}</span>
+            </button>
+            <button 
               onClick={() => {
                 // 清除所有缓存
                 localStorage.removeItem('runeQueryAddresses');
@@ -221,10 +257,10 @@ function RuneAssetViewer() {
           </div>
         )}
 
-        {(data || initialData) && (
+        {sortedRunes.length > 0 && (
           <div className="mt-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(data || initialData).map((rune, index) => (
+              {sortedRunes.map((rune, index) => (
                 <RuneCard
                   key={index}
                   symbol={rune.symbol}
