@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { ArrowPathIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import AddressInput from './components/AddressInput'
 import RuneCard from './components/RuneCard'
 
@@ -250,7 +252,7 @@ function RuneAssetViewer() {
                   .catch(error => {
                     console.error('获取BTC汇率失败:', error);
                     setIsRateLoading(false);
-                    alert('获取BTC汇率失败，请检查网络连接后重试');
+                    toast.error('获取BTC汇率失败，请检查网络连接后重试');
                   });
               }}
               className="p-2 rounded-md hover:bg-gray-200 flex items-center"
@@ -288,7 +290,7 @@ function RuneAssetViewer() {
                 
                 // 重新加载符文数据以更新价格
                 processRunes();
-                alert('符文价格缓存已清除，正在获取最新价格');
+                toast.success('符文价格缓存已清除，正在获取最新价格');
               }}
               className="p-2 rounded-md hover:bg-gray-200 flex items-center"
               title="刷新符文价格"
@@ -313,7 +315,7 @@ function RuneAssetViewer() {
                 // 重置状态
                 setInitialData(null);
                 setAddresses([]);
-                alert('缓存已清除，可以查询最新数据');
+                toast.success('缓存已清除，可以查询最新数据');
               }}
               className="p-2 rounded-md hover:bg-gray-200 flex items-center"
               title="清除缓存"
@@ -377,6 +379,18 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RuneAssetViewer />
+      <ToastContainer 
+        position="top-right"
+        autoClose={2000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </QueryClientProvider>
   )
 }
