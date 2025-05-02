@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDownIcon, ChevronUpIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronUpIcon, ArrowPathIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import config from '../config';
 
-const RuneCard = ({ symbol, holdings }) => {
+const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [price, setPrice] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +59,19 @@ const RuneCard = ({ symbol, holdings }) => {
     };
   }, [symbol]);
 
+
+
+
+
+  // 格式化显示价值
+  const formatValue = (amount) => {
+    if (currency === 'BTC') {
+      return `${(amount * price / 100000000).toFixed(8)} BTC`;
+    } else {
+      return `${(amount * price / 100000000 * btcRate).toFixed(2)} USDT`;
+    }
+  };
+
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden mb-4">
       <div 
@@ -70,7 +83,7 @@ const RuneCard = ({ symbol, holdings }) => {
           <div className="flex flex-col">
             <span className="text-sm text-gray-500">总量: {totalAmount.toFixed(4)}</span>
             <span className="text-sm text-green-600">
-              {isLoading ? (
+              {isLoading || isRateLoading ? (
                 <div className="flex items-center">
                   <ArrowPathIcon className="h-4 w-4 mr-1 animate-spin" />
                   加载中...
@@ -78,9 +91,10 @@ const RuneCard = ({ symbol, holdings }) => {
               ) : price === null ? (
                 <span className="text-red-600">价格查询失败</span>
               ) : (
-                `总价值: ${(totalAmount * price / 100000000).toFixed(8)} BTC`
+                `总价值: ${formatValue(totalAmount)}`
               )}
             </span>
+
           </div>
         </div>
         {isExpanded ? (
@@ -105,10 +119,10 @@ const RuneCard = ({ symbol, holdings }) => {
                   {/* {calculateActualAmount(holding.amount, holding.divisibility || 0).toFixed( holding.divisibility || 0)} */}
                   {calculateActualAmount(holding.amount, holding.divisibility || 0).toFixed( (holding.divisibility >= 4 ? 4 : holding.divisibility) || 0)}
                   <div className="text-xs text-green-600">
-                    {isLoading ? '加载中...' : price === null ? (
+                    {isLoading || isRateLoading ? '加载中...' : price === null ? (
                       <span className="text-red-600">查询失败</span>
                     ) : (
-                      `${(calculateActualAmount(holding.amount, holding.divisibility || 0) * price / 100000000).toFixed(8)} BTC`
+                      formatValue(calculateActualAmount(holding.amount, holding.divisibility || 0))
                     )}
                   </div>
                 </div>
