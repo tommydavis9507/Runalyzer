@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import AddressInput from './components/AddressInput'
 import RuneCard from './components/RuneCard'
@@ -103,6 +103,22 @@ function RuneAssetViewer() {
   const [currency, setCurrency] = useState('BTC'); // 'BTC' or 'USDT'
   const [btcRate, setBtcRate] = useState(0);
   const [isRateLoading, setIsRateLoading] = useState(false);
+  const [initialData, setInitialData] = useState(null);
+
+  // 加载缓存的符文数据
+  useEffect(() => {
+    const cachedAddresses = localStorage.getItem('runeQueryAddresses');
+    if (cachedAddresses) {
+      const addressList = cachedAddresses.split('\n').filter(addr => addr.length > 0);
+      if (addressList.length > 0) {
+        const cacheKey = `runeData-${addressList.join('-')}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          setInitialData(JSON.parse(cachedData));
+        }
+      }
+    }
+  }, []);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['runeData', addresses],
@@ -180,10 +196,10 @@ function RuneAssetViewer() {
           </div>
         )}
 
-        {data && (
+        {(data || initialData) && (
           <div className="mt-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data.map((rune, index) => (
+              {(data || initialData).map((rune, index) => (
                 <RuneCard
                   key={index}
                   symbol={rune.symbol}

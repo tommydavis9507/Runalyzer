@@ -2,6 +2,41 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDownIcon, ChevronUpIcon, ArrowPathIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import config from '../config';
 
+// 请求队列系统
+const requestQueue = {
+  queue: [],
+  inProgress: false,
+  delay: 300, // 请求间隔300ms
+  
+  addRequest: (fn) => {
+    return new Promise((resolve, reject) => {
+      requestQueue.queue.push({ fn, resolve, reject });
+      if (!requestQueue.inProgress) {
+        requestQueue.processNext();
+      }
+    });
+  },
+  
+  processNext: () => {
+    if (requestQueue.queue.length === 0) {
+      requestQueue.inProgress = false;
+      return;
+    }
+    
+    requestQueue.inProgress = true;
+    const { fn, resolve, reject } = requestQueue.queue.shift();
+    
+    fn()
+      .then(resolve)
+      .catch(reject)
+      .finally(() => {
+        setTimeout(() => {
+          requestQueue.processNext();
+        }, requestQueue.delay);
+      });
+  }
+};
+
 const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [price, setPrice] = useState(0);
@@ -16,41 +51,64 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
   const totalAmount = holdings.reduce((sum, holding) => 
     sum + calculateActualAmount(Number(holding.amount), holding.divisibility || 0), 0);
   
-  // 获取符文价格（带防抖和速率控制）
+  // 获取符文价格（带队列、缓存和重试机制）
   useEffect(() => {
     const fetchPrice = async () => {
+      // 检查缓存
+      const cacheKey = `runePrice-${symbol}`;
+      const cachedPrice = localStorage.getItem(cacheKey);
+      const cacheExpiry = localStorage.getItem(`${cacheKey}-expiry`);
+      
+      if (cachedPrice && cacheExpiry && Date.now() < Number(cacheExpiry)) {
+        setPrice(Number(cachedPrice));
+        return;
+      }
+      
       setIsLoading(true);
+      
       try {
-        const response = await fetch('https://open-api.unisat.io/v3/market/runes/auction/runes_types_specified', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${config.unisatApiKey}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            timeType: 'day1',
-            tick: symbol
-          })
+        const priceData = await requestQueue.addRequest(async () => {
+          const response = await fetch('https://open-api.unisat.io/v3/market/runes/auction/runes_types_specified', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${config.unisatApiKey}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              timeType: 'day1',
+              tick: symbol
+            })
+          });
+          
+          const data = await response.json();
+          if (data.code === 0) {
+            // 缓存价格，有效期5分钟
+            localStorage.setItem(cacheKey, data.data.curPrice);
+            localStorage.setItem(`${cacheKey}-expiry`, Date.now() + 300000);
+            return data.data.curPrice;
+          }
+          throw new Error(data.message || '获取符文价格失败');
         });
         
-        const data = await response.json();
-        if (data.code === 0) {
-          setPrice(data.data.curPrice); // 单位是sat
+        if (priceData) {
+          setPrice(priceData);
         }
       } catch (error) {
         console.error('获取符文价格失败:', error);
-        setPrice(null); // 设置为null表示查询失败
+        setPrice(null);
+        
+        // 重试机制
+        if (debounceTimer.current) {
+          clearTimeout(debounceTimer.current);
+        }
+        debounceTimer.current = setTimeout(fetchPrice, 1000);
       } finally {
         setIsLoading(false);
       }
     };
     
-    // 防抖和速率控制API请求（确保不超过5次/秒）
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-    debounceTimer.current = setTimeout(fetchPrice, 200); // 200ms间隔确保不超过5次/秒
+    fetchPrice();
     
     return () => {
       if (debounceTimer.current) {
