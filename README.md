@@ -1,12 +1,53 @@
-# React + Vite
+# 符文资产查询工具
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个基于React的Web应用，用于查询比特币地址的符文资产分布情况。
 
-Currently, two official plugins are available:
+## 功能特性
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 支持输入多个比特币地址查询符文资产
+- 自动验证比特币地址格式（支持bech32、segwit和legacy格式）
+- 显示符文资产总量和总价值（支持BTC和USDT计价）
+- 资产按价值排序（升序/降序）
+- 智能缓存机制减少API调用
+- 响应式设计，适配各种设备
 
-## Expanding the ESLint configuration
+## 安装指南
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. 克隆仓库
+```bash
+git clone <仓库地址>
+```
+
+2. 安装依赖
+```bash
+npm install
+```
+
+3. 配置API密钥
+复制`config.example.js`为`config.js`并填写UniSat API密钥
+
+## 使用方法
+
+1. 启动开发服务器
+```bash
+npm run dev
+```
+
+2. 在浏览器中访问`http://localhost:5174`
+
+3. 输入比特币地址（每行一个）并点击查询
+
+## 技术栈
+
+- React
+- Tailwind CSS
+- @tanstack/react-query
+- UniSat API
+
+## 截图
+
+![截图](public/vite.svg)
+
+## 许可证
+
+MIT
