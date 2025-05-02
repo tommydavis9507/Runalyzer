@@ -57,11 +57,17 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
       // 检查缓存
       const cacheKey = `runePrice-${symbol}`;
       const cachedPrice = localStorage.getItem(cacheKey);
-      const globalExpiry = localStorage.getItem('runePriceExpiry');
+      const priceExpiry = localStorage.getItem(`${cacheKey}-expiry`);
       
-      if (cachedPrice && globalExpiry && Date.now() < Number(globalExpiry)) {
+      if (cachedPrice && priceExpiry && Date.now() < Number(priceExpiry)) {
         setPrice(Number(cachedPrice));
         return;
+      }
+      
+      // 如果缓存过期，清除相关缓存
+      if (cachedPrice || priceExpiry) {
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(`${cacheKey}-expiry`);
       }
       
       setIsLoading(true);
@@ -83,9 +89,9 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
           
           const data = await response.json();
           if (data.code === 0) {
-            // 缓存价格，有效期5分钟
+            // 使用配置的缓存时间
             localStorage.setItem(cacheKey, data.data.curPrice);
-            localStorage.setItem('runePriceExpiry', Date.now() + 300000);
+            localStorage.setItem(`${cacheKey}-expiry`, Date.now() + config.runePriceCacheDuration);
 
             return data.data.curPrice;
           }

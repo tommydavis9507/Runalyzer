@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
 import AddressInput from './components/AddressInput'
 import RuneCard from './components/RuneCard'
 
@@ -14,9 +14,13 @@ const fetchRuneData = async (addresses) => {
   // 检查缓存
   const cacheKey = `runeData-${addresses.join('-')}`;
   const cachedData = localStorage.getItem(cacheKey);
-  if (cachedData) {
-    // return JSON.parse(cachedData);
+  const cacheExpiry = localStorage.getItem(`${cacheKey}-expiry`);
+  
+  if (cachedData && cacheExpiry && Date.now() < Number(cacheExpiry)) {
+    console.log('使用缓存的符文资产数据');
+    return JSON.parse(cachedData);
   }
+  console.log('获取符文资产数据');
 
   // 速率控制 - 确保不超过5次/秒
   const delay = 200; // 200ms间隔 = 5次/秒
@@ -61,6 +65,7 @@ const fetchRuneData = async (addresses) => {
   const result = Array.from(runeMap.values());
   // 保存到缓存
   localStorage.setItem(cacheKey, JSON.stringify(result));
+  localStorage.setItem(`${cacheKey}-expiry`, Date.now() + config.runeAssetCacheDuration);
   return result;
 }
 
@@ -112,47 +117,82 @@ function RuneAssetViewer() {
     queryKey: ['runeData', addresses],
     queryFn: () => fetchRuneData(addresses),
     enabled: addresses.length > 0,
-    staleTime: config.cacheDuration // 使用配置的缓存时间
+    staleTime: config.runeAssetCacheDuration,
+    cacheTime: config.runeAssetCacheDuration,
+    refetchOnMount: true
   })
 
   // 显示缓存状态
-  const [cacheTimeLeft, setCacheTimeLeft] = useState(0);
+  const [assetCacheTimeLeft, setAssetCacheTimeLeft] = useState(0);
+  const [priceCacheTimeLeft, setPriceCacheTimeLeft] = useState(0);
+
+  const processRunes = async () => {
+    const runeData = data || initialData;
+    if (!runeData) return;
+
+    const processed = await Promise.all(
+      runeData.map(async (rune) => {
+        const price = await fetchRunePrice(rune.symbol);
+        const totalValue = rune.holdings.reduce((sum, holding) => {
+          const amount = holding.amount / Math.pow(10, holding.divisibility || 0);
+          return sum + amount * (price || 0) / 100000000 * (currency === 'USDT' ? btcRate : 1);
+        }, 0);
+        return { ...rune, totalValue };
+      })
+    );
+    
+    const sorted = [...processed].sort((a, b) => 
+      sortOrder === 'desc' ? b.totalValue - a.totalValue : a.totalValue - b.totalValue
+    );
+    setSortedRunes(sorted);
+  };
   
   useEffect(() => {
     if (data) {
-      const updateCacheTimeLeft = () => {
-        const timeLeft = Math.floor((config.cacheDuration - (Date.now() % config.cacheDuration)) / 1000);
-        setCacheTimeLeft(timeLeft);
+      const cacheKey = `runeData-${addresses.join('-')}`;
+      const cacheExpiry = localStorage.getItem(`${cacheKey}-expiry`);
+      
+      const updateAssetCacheTimeLeft = () => {
+        if (!cacheExpiry || Date.now() >= Number(cacheExpiry)) {
+          setAssetCacheTimeLeft(0);
+          return;
+        }
+        const timeLeft = Math.floor((Number(cacheExpiry) - Date.now()) / 1000);
+        setAssetCacheTimeLeft(timeLeft > 0 ? timeLeft : 0);
       };
       
-      updateCacheTimeLeft();
-      const timer = setInterval(updateCacheTimeLeft, 1000);
+      updateAssetCacheTimeLeft();
+      const timer = setInterval(updateAssetCacheTimeLeft, 1000);
       return () => clearInterval(timer);
     }
-  }, [data]);
-
+  }, [data, addresses]);
+  
   useEffect(() => {
-    const processRunes = async () => {
-      const runeData = data || initialData;
-      if (!runeData) return;
-
-      const processed = await Promise.all(
-        runeData.map(async (rune) => {
-          const price = await fetchRunePrice(rune.symbol);
-          const totalValue = rune.holdings.reduce((sum, holding) => {
-            const amount = holding.amount / Math.pow(10, holding.divisibility || 0);
-            return sum + amount * (price || 0) / 100000000 * (currency === 'USDT' ? btcRate : 1);
-          }, 0);
-          return { ...rune, totalValue };
-        })
-      );
+    const updatePriceCacheTimeLeft = () => {
+      const keys = Object.keys(localStorage);
+      const priceExpiryKeys = keys.filter(key => key.startsWith('runePrice-') && key.endsWith('-expiry'));
       
-      const sorted = [...processed].sort((a, b) => 
-        sortOrder === 'desc' ? b.totalValue - a.totalValue : a.totalValue - b.totalValue
-      );
-      setSortedRunes(sorted);
+      if (priceExpiryKeys.length === 0) {
+        setPriceCacheTimeLeft(0);
+        return;
+      }
+      
+      const minExpiry = Math.min(...priceExpiryKeys.map(key => Number(localStorage.getItem(key))));
+      if (Date.now() >= minExpiry) {
+        setPriceCacheTimeLeft(0);
+        return;
+      }
+      
+      const timeLeft = Math.floor((minExpiry - Date.now()) / 1000);
+      setPriceCacheTimeLeft(timeLeft > 0 ? timeLeft : 0);
     };
     
+    updatePriceCacheTimeLeft();
+    const timer = setInterval(updatePriceCacheTimeLeft, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     processRunes();
   }, [data, initialData, currency, btcRate, sortOrder])
 
@@ -172,7 +212,13 @@ function RuneAssetViewer() {
   }, []);
 
   const handleAddressSubmit = (newAddresses) => {
-    setAddresses(newAddresses)
+    // 第一步：更新地址状态
+    setAddresses(newAddresses);
+    
+    // 第二步：如果地址不为空，立即触发数据获取
+    if (newAddresses.length > 0) {
+      queryClient.invalidateQueries(['runeData', newAddresses]);
+    }
   }
 
   return (
@@ -231,6 +277,27 @@ function RuneAssetViewer() {
             </button>
             <button 
               onClick={() => {
+                // 清除符文价格缓存
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                  if (key.startsWith('runePrice-')) {
+                    localStorage.removeItem(key);
+                  }
+                });
+                localStorage.removeItem('runePriceExpiry');
+                
+                // 重新加载符文数据以更新价格
+                processRunes();
+                alert('符文价格缓存已清除，正在获取最新价格');
+              }}
+              className="p-2 rounded-md hover:bg-gray-200 flex items-center"
+              title="刷新符文价格"
+            >
+              <ArrowPathIcon className="h-4 w-4" />
+              <span className="ml-1">刷新价格</span>
+            </button>
+            <button 
+              onClick={() => {
                 // 清除所有缓存，除了runeQueryAddresses
                 // localStorage.removeItem('runeQueryAddresses');
                 localStorage.removeItem('runePriceExpiry');
@@ -258,9 +325,14 @@ function RuneAssetViewer() {
 
         <AddressInput onAddressSubmit={handleAddressSubmit} />
 
-        {data && cacheTimeLeft > 0 && (
+        {(assetCacheTimeLeft > 0 || priceCacheTimeLeft > 0) && (
           <div className="text-center mb-4">
-            <p className="text-sm text-gray-500">使用缓存数据，{cacheTimeLeft}秒后更新</p>
+            {assetCacheTimeLeft > 0 && (
+              <p className="text-sm text-gray-500">使用缓存的符文资产数据，{assetCacheTimeLeft}秒后更新</p>
+            )}
+            {priceCacheTimeLeft > 0 && (
+              <p className="text-sm text-gray-500">使用缓存的符文价格数据，{priceCacheTimeLeft}秒后更新</p>
+            )}
           </div>
         )}
 
