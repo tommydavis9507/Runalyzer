@@ -41,6 +41,8 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [price, setPrice] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [usingCache, setUsingCache] = useState(false);
+  const [cacheTimeLeft, setCacheTimeLeft] = useState(0);
   const debounceTimer = useRef(null);
   
   // 计算实际持仓量（考虑精度）
@@ -57,11 +59,25 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
       // 检查缓存
       const cacheKey = `runePrice-${symbol}`;
       const cachedPrice = localStorage.getItem(cacheKey);
-      const cacheExpiry = localStorage.getItem(`${cacheKey}-expiry`);
+      const globalExpiry = localStorage.getItem('runePriceExpiry');
       
-      if (cachedPrice && cacheExpiry && Date.now() < Number(cacheExpiry)) {
+      if (cachedPrice && globalExpiry && Date.now() < Number(globalExpiry)) {
         setPrice(Number(cachedPrice));
-        return;
+        setUsingCache(true);
+        
+        // 设置倒计时
+        const updateCacheTimeLeft = () => {
+          const timeLeft = Math.floor((Number(globalExpiry) - Date.now()) / 1000);
+          setCacheTimeLeft(timeLeft);
+          if (timeLeft <= 0) {
+            clearInterval(timer);
+            fetchPrice(); // 重新获取价格
+          }
+        };
+        
+        updateCacheTimeLeft();
+        const timer = setInterval(updateCacheTimeLeft, 1000);
+        return () => clearInterval(timer);
       }
       
       setIsLoading(true);
@@ -85,7 +101,8 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
           if (data.code === 0) {
             // 缓存价格，有效期5分钟
             localStorage.setItem(cacheKey, data.data.curPrice);
-            localStorage.setItem(`${cacheKey}-expiry`, Date.now() + 300000);
+            localStorage.setItem('runePriceExpiry', Date.now() + 300000);
+            setUsingCache(false);
             return data.data.curPrice;
           }
           throw new Error(data.message || '获取符文价格失败');
@@ -149,7 +166,14 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
               ) : price === null ? (
                 <span className="text-red-600">价格查询失败</span>
               ) : (
-                `总价值: ${formatValue(totalAmount)}`
+                <div>
+                  {`总价值: ${formatValue(totalAmount)}`}
+                  {usingCache && (
+                    <div className="text-xs text-yellow-600">
+                      缓存数据，{cacheTimeLeft}秒后更新
+                    </div>
+                  )}
+                </div>
               )}
             </span>
 

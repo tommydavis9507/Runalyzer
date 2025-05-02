@@ -137,46 +137,71 @@ function RuneAssetViewer() {
         <div className="text-center mb-8 relative">
           <h1 className="text-3xl font-bold text-gray-900">符文资产查询工具</h1>
           <p className="mt-2 text-gray-600">输入比特币地址，快速查看符文持仓分布</p>
-          <button 
-            onClick={() => {
-              setIsRateLoading(true);
-              fetch('/api/gateio/spot/tickers?currency_pair=BTC_USDT')
-                .then(res => {
-                  if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+          <div className="absolute top-0 right-0 flex space-x-2">
+            <button 
+              onClick={() => {
+                setIsRateLoading(true);
+                fetch('/api/gateio/spot/tickers?currency_pair=BTC_USDT')
+                  .then(res => {
+                    if (!res.ok) {
+                      throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                  })
+                  .then(data => {
+                    if (data && data.length > 0) {
+                      setBtcRate(Number(data[0].last));
+                      setCurrency(currency === 'BTC' ? 'USDT' : 'BTC');
+                    } else {
+                      throw new Error('Invalid API response format');
+                    }
+                    setIsRateLoading(false);
+                  })
+                  .catch(error => {
+                    console.error('获取BTC汇率失败:', error);
+                    setIsRateLoading(false);
+                    alert('获取BTC汇率失败，请检查网络连接后重试');
+                  });
+              }}
+              className="p-2 rounded-md hover:bg-gray-200 flex items-center"
+              title="切换计价单位"
+            >
+              {isRateLoading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              ) : (
+                <span>{currency === 'BTC' ? 'USDT' : 'BTC'}</span>
+              )}
+            </button>
+            <button 
+              onClick={() => {
+                // 清除所有缓存
+                localStorage.removeItem('runeQueryAddresses');
+                localStorage.removeItem('runePriceExpiry');
+                
+                // 清除符文数据缓存
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                  if (key.startsWith('runeData-') || key.startsWith('runePrice-')) {
+                    localStorage.removeItem(key);
                   }
-                  return res.json();
-                })
-                .then(data => {
-                  if (data && data.length > 0) {
-                    setBtcRate(Number(data[0].last));
-                    setCurrency(currency === 'BTC' ? 'USDT' : 'BTC');
-                  } else {
-                    throw new Error('Invalid API response format');
-                  }
-                  setIsRateLoading(false);
-                })
-                .catch(error => {
-                  console.error('获取BTC汇率失败:', error);
-                  setIsRateLoading(false);
-                  // 保持当前计价单位不变
-                  alert('获取BTC汇率失败，请检查网络连接后重试');
                 });
-            }}
-            className="absolute top-0 right-0 p-2 rounded-md hover:bg-gray-200 flex items-center"
-            title="切换计价单位"
-          >
-            {isRateLoading ? (
-              <div className="flex items-center">
-                <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              </div>
-            ) : (
-              <span>{currency === 'BTC' ? 'USDT' : 'BTC'}</span>
-            )}
-          </button>
+                
+                // 重置状态
+                setInitialData(null);
+                setAddresses([]);
+                alert('缓存已清除，可以查询最新数据');
+              }}
+              className="p-2 rounded-md hover:bg-gray-200 flex items-center"
+              title="清除缓存"
+            >
+              清除缓存
+            </button>
+          </div>
         </div>
 
         <AddressInput onAddressSubmit={handleAddressSubmit} />
