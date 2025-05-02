@@ -44,10 +44,6 @@ npm run dev
 - @tanstack/react-query
 - UniSat API
 
-## 截图
-
-![截图](public/vite.svg)
-
 ## 许可证
 
 MIT
