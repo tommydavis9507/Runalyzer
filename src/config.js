@@ -4,7 +4,8 @@ const config = {
   rateLimit: {
     perSecond: 5, // 每秒最多5次请求
     perDay: 2000 // 每天最多2000次请求
-  }
+  },
+  cacheDuration: 60000 // 缓存时间，单位：毫秒（1分钟）
 };
 
 export default config;

@@ -41,8 +41,6 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [price, setPrice] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [usingCache, setUsingCache] = useState(false);
-  const [cacheTimeLeft, setCacheTimeLeft] = useState(0);
   const debounceTimer = useRef(null);
   
   // 计算实际持仓量（考虑精度）
@@ -63,21 +61,7 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
       
       if (cachedPrice && globalExpiry && Date.now() < Number(globalExpiry)) {
         setPrice(Number(cachedPrice));
-        setUsingCache(true);
-        
-        // 设置倒计时
-        const updateCacheTimeLeft = () => {
-          const timeLeft = Math.floor((Number(globalExpiry) - Date.now()) / 1000);
-          setCacheTimeLeft(timeLeft);
-          if (timeLeft <= 0) {
-            clearInterval(timer);
-            fetchPrice(); // 重新获取价格
-          }
-        };
-        
-        updateCacheTimeLeft();
-        const timer = setInterval(updateCacheTimeLeft, 1000);
-        return () => clearInterval(timer);
+        return;
       }
       
       setIsLoading(true);
@@ -102,7 +86,7 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
             // 缓存价格，有效期5分钟
             localStorage.setItem(cacheKey, data.data.curPrice);
             localStorage.setItem('runePriceExpiry', Date.now() + 300000);
-            setUsingCache(false);
+
             return data.data.curPrice;
           }
           throw new Error(data.message || '获取符文价格失败');
@@ -168,11 +152,6 @@ const RuneCard = ({ symbol, holdings, currency, btcRate, isRateLoading }) => {
               ) : (
                 <div>
                   {`总价值: ${formatValue(totalAmount)}`}
-                  {usingCache && (
-                    <div className="text-xs text-yellow-600">
-                      缓存数据，{cacheTimeLeft}秒后更新
-                    </div>
-                  )}
                 </div>
               )}
             </span>

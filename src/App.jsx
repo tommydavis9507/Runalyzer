@@ -112,8 +112,24 @@ function RuneAssetViewer() {
     queryKey: ['runeData', addresses],
     queryFn: () => fetchRuneData(addresses),
     enabled: addresses.length > 0,
-    staleTime: 30000 // 30秒内不重新请求
+    staleTime: config.cacheDuration // 使用配置的缓存时间
   })
+
+  // 显示缓存状态
+  const [cacheTimeLeft, setCacheTimeLeft] = useState(0);
+  
+  useEffect(() => {
+    if (data) {
+      const updateCacheTimeLeft = () => {
+        const timeLeft = Math.floor((config.cacheDuration - (Date.now() % config.cacheDuration)) / 1000);
+        setCacheTimeLeft(timeLeft);
+      };
+      
+      updateCacheTimeLeft();
+      const timer = setInterval(updateCacheTimeLeft, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [data]);
 
   useEffect(() => {
     const processRunes = async () => {
@@ -215,8 +231,8 @@ function RuneAssetViewer() {
             </button>
             <button 
               onClick={() => {
-                // 清除所有缓存
-                localStorage.removeItem('runeQueryAddresses');
+                // 清除所有缓存，除了runeQueryAddresses
+                // localStorage.removeItem('runeQueryAddresses');
                 localStorage.removeItem('runePriceExpiry');
                 
                 // 清除符文数据缓存
@@ -241,6 +257,12 @@ function RuneAssetViewer() {
         </div>
 
         <AddressInput onAddressSubmit={handleAddressSubmit} />
+
+        {data && cacheTimeLeft > 0 && (
+          <div className="text-center mb-4">
+            <p className="text-sm text-gray-500">使用缓存数据，{cacheTimeLeft}秒后更新</p>
+          </div>
+        )}
 
         {isLoading && (
           <div className="text-center py-8">
